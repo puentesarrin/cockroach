@@ -14,10 +14,10 @@
     "d3/d3.d.ts": {
       "commit": "3b7f250dcf631f1c3c545e28d9ff25920c60b5f7"
     },
-    "mocha/mocha.d.ts": {
+    "lodash/lodash.d.ts": {
       "commit": "3b7f250dcf631f1c3c545e28d9ff25920c60b5f7"
     },
-    "lodash/lodash.d.ts": {
+    "mocha/mocha.d.ts": {
       "commit": "3b7f250dcf631f1c3c545e28d9ff25920c60b5f7"
     }
   }
