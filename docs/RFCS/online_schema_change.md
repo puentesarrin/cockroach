@@ -131,8 +131,24 @@ Since schema change operations are potentially long running they need
 to be restartable or abortable if the node performing them dies. We
 accomplish this by performing the schema change operation for a table
 on a well known node: the replica holding the leader lease for the
-first range of the table (i.e. containing the key `/<tableID>`). When
-a node receives a schema change operation such as `CREATE INDEX` it
+first range of the table (i.e. containing the key `/<tableID>`), known
+as the "table leader". Each node discovers via gossip the list of
+all configured tables, and starts a table leader goroutine
+for each table it is a leader for. A table leader goroutine
+executes schema changes on its table, and exits
+as soon as it discovers it has lost its leader lease.
+
+It is critical, that the goroutine chunk its processing into small
+enough chunks, to allow it to relinquish leadership in a timely manner.
+While it is safe to apply the same schema change concurrently, it is
+unsafe to have two different schema changes be processed concurrently.
+A safe hand off from one leader to another is achieved, by the leader
+writing (CPUT) a schema change lease timestamp into the descriptor,
+before it performs a chunk of work. A new leader waits until the lease
+expires before it starts working. If no schema change is in progress,
+a new leader will start immediately.
+
+When a node receives a schema change operation such as `CREATE INDEX` it
 will forward the operation to this "table leader". When the table
 leader restarts it will load the associated table descriptor and
 restart or abort the schema change operation. Note that aborting a
@@ -168,9 +184,9 @@ changes on a table (e.g. concurrently adding multiple indexes).
 * If the node performing the backfill gets restarted we should figure
   out a way to avoid restarting the backfill from scratch. One thought
   is that the backfill operation can periodically checkpoint the high
-  water mark of its progress: either in the descriptor itself (taking
-  care not to bump the version) or in a separate backfill checkpoint
-  table.
+  water mark of its progress along with the schema change lease timestamp:
+  either in the descriptor itself (taking care not to bump the version)
+  or in a separate backfill checkpoint table.
 
 * Figure out how to distribute the backfill work. Ideally we would
   have each range of the primary index generate and write the index
